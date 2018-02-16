@@ -95,12 +95,12 @@ private void login() {
         .start(this, new AuthCallback() {
             @Override
             public void onFailure(@NonNull Dialog dialog) {
-            // Show error Dialog to user
+                // Show error Dialog to user
             }
 
             @Override
             public void onFailure(AuthenticationException exception) {
-            // Show error to user
+                // Show error to user
             }
 
             @Override

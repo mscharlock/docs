@@ -91,7 +91,7 @@ Ideally a single class should manage the handling of credentials. You can share 
 
 ## Save the User's Credentials
 
-After a successful login response, you can verify the tokens against the [userinfo endpoint](/api/authentication#get-user-info) and then store the user's credentials using the `saveCredentials` method.
+After a successful login response, you can store the user's credentials using the `saveCredentials` method.
 
 ```java
 // app/src/main/java/com/auth0/samples/LoginActivity.java
@@ -109,24 +109,10 @@ private final AuthCallback webCallback = new AuthCallback() {
 
     @Override
     public void onSuccess(@NonNull Credentials credentials) {
-        verifyTokens(credentials);
+        //user successfully authenticated
+        credentialsManager.saveCredentials(credentials);
     }
 };
-
-private void verifyTokens(final Credentials credentials) {
-    client.userInfo(credentials.getAccessToken()).start(new BaseCallback<UserProfile, AuthenticationException>() {
-        @Override
-        public void onSuccess(UserProfile payload) {
-            credentialsManager.saveCredentials(credentials);
-            //user successfully authenticated
-        }
-
-        @Override
-        public void onFailure(final AuthenticationException exception) {
-            //show error message
-        }
-    });
-}
 ```
 
 ::: note

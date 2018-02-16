@@ -23,9 +23,32 @@ This tutorial shows you how to link two different accounts for the same user usi
 Before you continue with this tutorial, make sure that you have completed the previous tutorials. This tutorial assumes that:
 * You have integrated [Auth0](https://github.com/auth0/Auth0.Android) as a dependency in your project.
 * You are familiar with the `WebAuthProvider` class. To learn more, see the [Login](/quickstart/native/android/00-login) and the [Session Handling](/quickstart/native/android/03-session-handling) tutorials.
-* You are familiar with the concepts of `userId` and `idToken`. You can find info about them in the [Session Handling](/quickstart/native/android/03-session-handling) and the [User Profile](/quickstart/native/android/04-user-profile) tutorial.
+* You are familiar with the concepts of `userId`, `accessToken` and `idToken`. You can find info about them in the [Session Handling](/quickstart/native/android/03-session-handling) and the [User Profile](/quickstart/native/android/04-user-profile) tutorials.
 
 We recommend that you read the [Linking Accounts](/link-accounts) documentation to understand the process of linking accounts.
+
+## API scopes on Authentication
+
+As seen previously in the [User Profile](/quickstart/native/android/04-user-profile) tutorial, you need to request the Management API audience and the corresponding scopes to be able to read the full user profile and edit their identities, since they are not part of the OIDC specification. Each identity in the user profile represents details from the authentication provider used to log in. e.g. the user's Facebook account details.
+
+Find the snippet in which you initialize the `WebAuthProvider` class. To that snippet, add the line `withScope("openid profile email read:current_user update:current_user_identities")` and `withAudience(String.format("https://%s/api/v2/", getString(R.string.com_auth0_domain)))`.
+
+```java
+// app/src/main/java/com/auth0/samples/activities/LoginActivity.java
+
+Auth0 auth0 = new Auth0(this);
+auth0.setOIDCConformant(true);
+WebAuthProvider.init(auth0)
+    .withScheme("demo")
+    .withAudience(String.format("https://%s/api/v2/", getString(R.string.com_auth0_domain)))
+    .withScope("openid profile email read:current_user update:current_user_identities")
+    .start(this, callback);
+```
+
+::: note
+Note that the Management API audience value ends in `/` in constrast to the User Info audience. 
+:::
+
 
 ## Enter Account Credentials
 
@@ -68,7 +91,7 @@ protected void onCreate(Bundle savedInstanceState) {
     // Obtain the existing credentials and move to the next activity
     credentialsManager.getCredentials(new BaseCallback<Credentials, CredentialsManagerException>() {
         @Override
-        public void onSuccess(final Credentials credentials) {
+        public void onSuccess(Credentials credentials) {
             showNextActivity(credentials);
         }
 
@@ -106,7 +129,7 @@ protected void onSaveInstanceState(Bundle outState) {
 }
 ```
 
-In the login response, based on the boolean flag set in the first step, decide if you need to show the `MainActivity` screen, or continue to link the accounts. Remember to verify the tokens before proceeding.
+In the login response, based on the boolean flag set in the first step, decide if you need to show the `MainActivity` screen, or continue to link the accounts.
 
 ```java
 // app/src/main/java/com/auth0/samples/activities/LoginActivity.java
@@ -126,32 +149,17 @@ private final AuthCallback webCallback = new AuthCallback() {
 
     @Override
     public void onSuccess(@NonNull Credentials credentials) {
-        verifyTokens(credentials);
+        if (linkSessions) {
+            // Link the accounts
+            performLink(credentials.getIdToken());
+            return;
+        }
+
+        //Store the credentials and move to the next activity
+        credentialsManager.saveCredentials(credentials);
+        showNextActivity(credentials);
     }
 };
-
-private void verifyTokens(final Credentials credentials) {
-    client.userInfo(credentials.getAccessToken()).start(new BaseCallback<UserProfile, AuthenticationException>() {
-        @Override
-        public void onSuccess(UserProfile payload) {
-            if (linkSessions) {
-                // Link the accounts
-                performLink(credentials.getIdToken());
-                return;
-            }
-
-            //Store the credentials and move to the next activity
-            credentialsManager.saveCredentials(credentials);
-            showNextActivity(credentials);
-        }
-
-        @Override
-        public void onFailure(final AuthenticationException exception) {
-            //show error message 
-            //If currently linking accounts, finish.
-        }
-    });
-}
 ```
 
 ::: note
@@ -161,15 +169,13 @@ Make sure to handle the callback's failure calls as well
 
 ## Link the Accounts
 
-Now, you can link the accounts. To do this, you need the logged-in user's ID and the ID Tokens for the two accounts: 
-* The saved account the user initially logged in to
-* The second account received in the last login response
+Now, you can link the accounts. To do this, you need the logged-in user's ID and Access Token, and the ID Token for the secondary account received in the last login response.
 
 ```java
 // app/src/main/java/com/auth0/samples/activities/LoginActivity.java
 
 private void performLink(final String secondaryIdToken) {
-    UsersAPIClient client = new UsersAPIClient(auth0, getIntent().getExtras().getString(KEY_ID_TOKEN));
+    UsersAPIClient client = new UsersAPIClient(auth0, getIntent().getExtras().getString(KEY_ACCESS_TOKEN));
     String primaryUserId = getIntent().getExtras().getString(KEY_PRIMARY_USER_ID);
     client.link(primaryUserId, secondaryIdToken)
         .start(new BaseCallback<List<UserIdentity>, ManagementException>() {
@@ -218,14 +224,12 @@ To unlink the accounts, you need to specify the following:
 * user ID for the linked account
 * the provider name for the linked account
 
-To instantiate the `UsersAPIClient` client, use the ID Token for the main account.
+To instantiate the `UsersAPIClient` client, use the Access Token for the main account like before.
 
 ```java
 // app/src/main/java/com/auth0/samples/activities/MainActivity.java
 
-UsersAPIClient client = new UsersAPIClient(auth0, primaryIdToken);
-
-client.unlink(userProfile.getId(), secondaryAccountIdentity.getId(), secondaryAccountIdentity.getProvider())
+usersClient.unlink(userProfile.getId(), secondaryAccountIdentity.getId(), secondaryAccountIdentity.getProvider())
     .start(new BaseCallback<List<UserIdentity>, ManagementException>() {
         @Override
         public void onSuccess(List<UserIdentity> userIdentities) {
