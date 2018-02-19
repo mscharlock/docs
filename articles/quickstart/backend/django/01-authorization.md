@@ -9,7 +9,7 @@ description: This tutorial dmonstrates how to use Auth0 to add authorization to 
   path: '01-Authorization',
   requirements: [
     'python 2.7, 3.3 and up',
-    'django 1.8 and up',
+    'django 1.x, 1.8 and up, not django 2.x',
     'djangorestframework 3.0 and up',
     'djangorestframework-jwt 1.11.0',
     'python-jose 1.3.2',
